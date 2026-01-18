@@ -5,7 +5,10 @@ const cors = require('cors');
 const app = express();
 
 // --- Middleware ---
-app.use(cors());
+app.use(cors({
+    origin: '*', // Izinkan akses dari website mana saja
+    methods: ['GET', 'POST']
+}));
 app.use(express.json()); 
 
 // --- KONFIGURASI DIGIFLAZZ ---
@@ -80,3 +83,4 @@ const PORT = process.env.PORT || 3000; // Railway akan mengubah PORT secara otom
 app.listen(PORT, () => {
     console.log(`✅ Server Berjalan di Port ${PORT}`);
 });
+
