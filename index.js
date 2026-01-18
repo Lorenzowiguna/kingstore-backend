@@ -4,10 +4,9 @@ const crypto = require('crypto');
 const cors = require('cors');
 const app = express();
 
-// --- PENTING: Middleware ini WAJIB ada agar bisa baca JSON dari website ---
+// --- Middleware ---
 app.use(cors());
 app.use(express.json()); 
-// ---------------------------------------------------------------------------
 
 // --- KONFIGURASI DIGIFLAZZ ---
 const DIGI_USERNAME = 'hosoyagdKvZW';       
@@ -48,7 +47,7 @@ app.get('/products', async (req, res) => {
 // 3. TRANSAKSI (BELI)
 app.post('/transaksi', async (req, res) => {
     try {
-        // Debug: Lihat apa yang dikirim website
+        // Debug sudah saya pindahkan ke dalam sini
         console.log("Data Masuk:", req.body);
 
         const { sku_code, customer_no } = req.body;
@@ -77,6 +76,7 @@ app.post('/transaksi', async (req, res) => {
 });
 
 // JALANKAN SERVER
-app.listen(3000, () => {
-    console.log('✅ Server Backend Berjalan di http://localhost:3000');
+const PORT = process.env.PORT || 3000; // Railway akan mengubah PORT secara otomatis
+app.listen(PORT, () => {
+    console.log(`✅ Server Berjalan di Port ${PORT}`);
 });
