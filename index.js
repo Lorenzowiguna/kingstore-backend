@@ -4,40 +4,46 @@ const crypto = require('crypto');
 const cors = require('cors');
 const app = express();
 
-// --- KONFIGURASI KHUSUS UNTUK RENDER ---
-// Mengambil variable Environment dari Render
+// --- KONFIGURASI KHUSUS RENDER ---
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
-const PORT = process.env.PORT || 3000;
 
 // --- MIDDLEWARE CORS ---
-// Render membutuhkan ini agar mengizinkan request dari Netlify
+// Render sangat ketat dengan preflight, kita izinkan semua
 app.use(cors({
     origin: ALLOWED_ORIGINS,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 
 app.use(express.json()); 
 
 // --- KONFIGURASI DIGIFLAZZ ---
-// Kita ambil langsung dari Environment Variable, bukan hardcode di file
+// Ambil dari Environment Variables Render
 const DIGI_USERNAME = process.env.DIGI_USERNAME || 'hosoyagdKvZW';       
 const DIGI_PRODI_KEY = process.env.DIGI_PRODI_KEY || 'dev-326ef180-f44c-11f0-ac1a-0dae229853ad'; 
 const BASE_URL = 'https://api.digiflazz.com/v1';
 
+// --- FUNGSI HELPER RESPONSE ---
+function sendResponse(res, data) {
+    // Pastikan Header CORS selalu dikirim
+    res.header('Access-Control-Allow-Origin', ALLOWED_ORIGINS);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.json(data);
+}
+
 // 1. CEK SALDO
 app.get('/cek-saldo', async (req, res) => {
     try {
-        // Signature Depo
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + "depo").digest('hex');
         const response = await axios.post(`${BASE_URL}/cek-saldo`, {
             cmd: 'deposit',
             username: DIGI_USERNAME,
             sign: sign
         });
-        res.json({ status: 'Berhasil Terkoneksi ke Digiflazz!', saldo: response.data.data });
+        sendResponse(res, { status: 'Berhasil Terkoneksi ke Digiflazz!', saldo: response.data.data });
     } catch (error) {
-        res.status(500).json({ status: 'Gagal', pesan: error.message });
+        sendResponse(res, { status: 'Gagal', pesan: error.message });
     }
 });
 
@@ -51,13 +57,22 @@ app.get('/products', async (req, res) => {
             sign: sign
         });
         const games = response.data.data.filter(item => item.brand === 'MOBILE LEGENDS' && item.status === true);
-        res.json(games);
+        sendResponse(res, games);
     } catch (error) {
-        res.status(500).json({ status: 'Gagal', pesan: error.message });
+        sendResponse(res, { status: 'Gagal', pesan: error.message });
     }
 });
 
-// 3. TRANSAKSI
+// --- HANDLER PREFLIGHT (ANTI ERROR RENDER) ---
+app.options('/transaksi', (req, res) => {
+    // Kirim status 200 OK untuk permintaan preflight (OPTIONS)
+    res.header('Access-Control-Allow-Origin', ALLOWED_ORIGINS);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+});
+
+// 3. TRANSAKSI (BELI)
 app.post('/transaksi', async (req, res) => {
     try {
         console.log("Data Masuk:", req.body);
@@ -65,12 +80,10 @@ app.post('/transaksi', async (req, res) => {
         const { sku_code, customer_no } = req.body;
 
         if (!sku_code || !customer_no) {
-            return res.status(400).json({ status: 'Gagal', pesan: 'Data kurang lengkap' });
+            return sendResponse(res, { status: 'Gagal', pesan: 'SKU Code dan Customer No wajib diisi!' });
         }
 
         const ref_id = "TRX" + Date.now();
-        
-        // Rumus MD5 Signature Digiflazz
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + ref_id).digest('hex');
 
         const response = await axios.post(`${BASE_URL}/transaction`, {
@@ -81,15 +94,16 @@ app.post('/transaksi', async (req, res) => {
             sign: sign
         });
 
-        res.json({ status: 'Sukses', data_digiflazz: response.data.data });
+        sendResponse(res, { status: 'Sukses', data_digiflazz: response.data.data });
 
     } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ status: 'Gagal', pesan: error.message });
+        console.error("Error Transaksi:", error.message);
+        sendResponse(res, { status: 'Gagal', pesan: error.message });
     }
 });
 
 // JALANKAN SERVER
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Server Berjalan di Port ${PORT}`);
 });
