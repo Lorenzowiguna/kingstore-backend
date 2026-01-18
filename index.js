@@ -4,21 +4,31 @@ const crypto = require('crypto');
 const cors = require('cors');
 const app = express();
 
-// --- Middleware ---
-app.use(cors());
+// --- KONFIGURASI KHUSUS UNTUK RENDER ---
+// Mengambil variable Environment dari Render
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
+const PORT = process.env.PORT || 3000;
+
+// --- MIDDLEWARE CORS ---
+// Render membutuhkan ini agar mengizinkan request dari Netlify
+app.use(cors({
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
+
 app.use(express.json()); 
 
 // --- KONFIGURASI DIGIFLAZZ ---
-const DIGI_USERNAME = 'hosoyagdKvZW';       
-const DIGI_PRODI_KEY = 'dev-326ef180-f44c-11f0-ac1a-0dae229853ad'; 
+// Kita ambil langsung dari Environment Variable, bukan hardcode di file
+const DIGI_USERNAME = process.env.DIGI_USERNAME || 'hosoyagdKvZW';       
+const DIGI_PRODI_KEY = process.env.DIGI_PRODI_KEY || 'dev-326ef180-f44c-11f0-ac1a-0dae229853ad'; 
 const BASE_URL = 'https://api.digiflazz.com/v1';
 
 // 1. CEK SALDO
 app.get('/cek-saldo', async (req, res) => {
-    // Set Header agar browser tidak blokir
-    res.header('Access-Control-Allow-Origin', '*');
-    
     try {
+        // Signature Depo
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + "depo").digest('hex');
         const response = await axios.post(`${BASE_URL}/cek-saldo`, {
             cmd: 'deposit',
@@ -33,8 +43,6 @@ app.get('/cek-saldo', async (req, res) => {
 
 // 2. CEK PRODUK
 app.get('/products', async (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    
     try {
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + "pricelist").digest('hex');
         const response = await axios.post(`${BASE_URL}/price-list`, {
@@ -49,21 +57,20 @@ app.get('/products', async (req, res) => {
     }
 });
 
-// 3. TRANSAKSI (BELI)
+// 3. TRANSAKSI
 app.post('/transaksi', async (req, res) => {
-    // Set Header untuk POST request
-    res.header('Access-Control-Allow-Origin', '*');
-
     try {
         console.log("Data Masuk:", req.body);
 
         const { sku_code, customer_no } = req.body;
 
         if (!sku_code || !customer_no) {
-            return res.status(400).json({ status: 'Gagal', pesan: 'SKU Code dan Customer No wajib diisi!' });
+            return res.status(400).json({ status: 'Gagal', pesan: 'Data kurang lengkap' });
         }
 
         const ref_id = "TRX" + Date.now();
+        
+        // Rumus MD5 Signature Digiflazz
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + ref_id).digest('hex');
 
         const response = await axios.post(`${BASE_URL}/transaction`, {
@@ -77,13 +84,12 @@ app.post('/transaksi', async (req, res) => {
         res.json({ status: 'Sukses', data_digiflazz: response.data.data });
 
     } catch (error) {
-        console.error("Error Transaksi:", error.message);
+        console.error("Error:", error.message);
         res.status(500).json({ status: 'Gagal', pesan: error.message });
     }
 });
 
 // JALANKAN SERVER
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Server Berjalan di Port ${PORT}`);
 });
