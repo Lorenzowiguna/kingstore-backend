@@ -5,10 +5,7 @@ const cors = require('cors');
 const app = express();
 
 // --- Middleware ---
-app.use(cors({
-    origin: '*', // Izinkan akses dari website mana saja
-    methods: ['GET', 'POST']
-}));
+app.use(cors());
 app.use(express.json()); 
 
 // --- KONFIGURASI DIGIFLAZZ ---
@@ -18,6 +15,9 @@ const BASE_URL = 'https://api.digiflazz.com/v1';
 
 // 1. CEK SALDO
 app.get('/cek-saldo', async (req, res) => {
+    // Set Header agar browser tidak blokir
+    res.header('Access-Control-Allow-Origin', '*');
+    
     try {
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + "depo").digest('hex');
         const response = await axios.post(`${BASE_URL}/cek-saldo`, {
@@ -33,6 +33,8 @@ app.get('/cek-saldo', async (req, res) => {
 
 // 2. CEK PRODUK
 app.get('/products', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    
     try {
         const sign = crypto.createHash('md5').update(DIGI_USERNAME + DIGI_PRODI_KEY + "pricelist").digest('hex');
         const response = await axios.post(`${BASE_URL}/price-list`, {
@@ -49,8 +51,10 @@ app.get('/products', async (req, res) => {
 
 // 3. TRANSAKSI (BELI)
 app.post('/transaksi', async (req, res) => {
+    // Set Header untuk POST request
+    res.header('Access-Control-Allow-Origin', '*');
+
     try {
-        // Debug sudah saya pindahkan ke dalam sini
         console.log("Data Masuk:", req.body);
 
         const { sku_code, customer_no } = req.body;
@@ -79,8 +83,7 @@ app.post('/transaksi', async (req, res) => {
 });
 
 // JALANKAN SERVER
-const PORT = process.env.PORT || 3000; // Railway akan mengubah PORT secara otomatis
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Server Berjalan di Port ${PORT}`);
 });
-
